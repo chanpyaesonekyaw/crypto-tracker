@@ -10,7 +10,8 @@ A real-time cryptocurrency dashboard built with React and Vite, powered by the C
 - **Sort** by rank, name, price, 24h change, or market cap
 - **Grid and list views**, each with inline 7-day sparklines
 - **Coin detail page** with a 7-day price chart, 24h high/low, market cap, volume, and supply stats
-- **Client-side caching** to reduce redundant API calls (30s for market data, 60s for coin detail and chart data)
+- **News feed** on the homepage (market-wide) and coin detail page (filtered to that coin), via cryptocurrency.cv
+- **Client-side caching** to reduce redundant API calls (30s for market data, 60s for coin detail, chart, and news data)
 
 ## Tech Stack
 
@@ -20,7 +21,8 @@ A real-time cryptocurrency dashboard built with React and Vite, powered by the C
 | Build tool | [Vite](https://vite.dev)                   |
 | Routing    | [React Router](https://reactrouter.com)    |
 | Charts     | [Recharts](https://recharts.org)           |
-| Data       | [CoinGecko API](https://www.coingecko.com/en/api) |
+| Market data | [CoinGecko API](https://www.coingecko.com/en/api) |
+| News       | [cryptocurrency.cv](https://cryptocurrency.cv) (free, no API key) |
 
 ## Getting Started
 
@@ -39,13 +41,21 @@ npm install
 
 ### Environment variables
 
-This project calls the CoinGecko API with a Demo API key. Create a `.env` file in the project root:
+This project needs one free API key, for market data (CoinGecko). The news feed uses [cryptocurrency.cv](https://cryptocurrency.cv), which requires no key.
+
+Sign up at the [CoinGecko API pricing page](https://www.coingecko.com/en/api/pricing) and grab your Demo API key from the developer dashboard.
+
+Copy the example file and fill in your key:
 
 ```bash
-VITE_COINGECKO_API_KEY=your_api_key_here
+cp .env.example .env
 ```
 
-> **Note:** The API key is currently hardcoded in `src/api/coinGecko.js`. Before deploying, move it to an environment variable (`import.meta.env.VITE_COINGECKO_API_KEY`) so it isn't committed to version control.
+```bash
+VITE_COINGECKO_API_KEY=your_coingecko_api_key_here
+```
+
+`.env` is already covered by `.gitignore`, so your key won't be committed. Note that Vite inlines `VITE_*` variables into the client bundle at build time — fine for a free-tier key with generous rate limits, but don't use this pattern for a key tied to billing.
 
 ### Run the dev server
 
@@ -67,20 +77,23 @@ npm run preview
 ```
 src/
 ├── api/
-│   └── coinGecko.js      # API client + response caching
+│   ├── coinGecko.js       # Market data client + response caching
+│   └── cryptoNews.js      # News client + response caching
 ├── components/
-│   └── CryptoCard.jsx    # Grid/list card with sparkline
+│   ├── CryptoCard.jsx     # Grid/list card with sparkline
+│   └── NewsPanel.jsx      # News feed (used on both pages)
 ├── pages/
-│   ├── Home.jsx          # Market list, search, sort, ticker tape
-│   └── CoinDetail.jsx    # Single-coin detail view with chart
+│   ├── Home.jsx           # Market list, search, sort, ticker tape, news
+│   └── CoinDetail.jsx     # Single-coin detail view with chart and news
 ├── utils/
-│   └── formatter.js      # Price, market cap, and % change formatting
-└── index.css             # Design tokens and component styles
+│   └── formatter.js       # Price, market cap, % change, and time formatting
+└── index.css              # Design tokens and component styles
 ```
 
-## Data Source
+## Data Sources
 
-Market data, coin details, and historical price charts are fetched from the [CoinGecko API v3](https://docs.coingecko.com/reference/introduction). Rate limits apply on the free Demo tier — the built-in caching layer is tuned to stay within them under normal use.
+- **Market data, coin details, and price history** — [CoinGecko API v3](https://docs.coingecko.com/reference/introduction). Rate limits apply on the free Demo tier — the built-in caching layer is tuned to stay within them under normal use.
+- **News** — [cryptocurrency.cv](https://cryptocurrency.cv), a free, keyless, open-source news aggregator. The homepage shows the general market feed; the coin detail page filters to that coin's ticker. It's a smaller independent project rather than an established provider, so the news section is built to fail silently (it simply doesn't render) if the API is ever unavailable.
 
 ## License
 

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchCryptos } from "../api/coinGecko";
 import { CryptoCard } from "../components/CryptoCard";
+import { NewsPanel } from "../components/NewsPanel";
+import { MarketStatsBar } from "../components/MarketStatsBar";
+import { TrendingStrip } from "../components/TrendingStrip";
 import { formatChange } from "../utils/formatter";
 
 export const Home = () => {
@@ -119,6 +122,8 @@ export const Home = () => {
                 </div>
             </header>
 
+            <MarketStatsBar />
+
             {!isLoading && topMovers.length > 0 && (
                 <div className="ticker-tape">
                     <div className="ticker-track">
@@ -141,6 +146,8 @@ export const Home = () => {
                     </div>
                 </div>
             )}
+
+            <TrendingStrip />
 
             <div className="controls">
                 <div className="filter-group">
@@ -196,6 +203,12 @@ export const Home = () => {
                         ))}
                     </div>
                 </>
+            )}
+
+            {!isLoading && (
+                <div className="news-wrapper">
+                    <NewsPanel title="Latest Market News" limit={6} />
+                </div>
             )}
 
             <footer className="footer">

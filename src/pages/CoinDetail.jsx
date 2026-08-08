@@ -1,7 +1,8 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchChartData, fetchCoinData } from "../api/coinGecko";
 import { useEffect, useState } from "react";
-import { formatMarketCap, formatPrice } from "../utils/formatter";
+import { formatMarketCap, formatPrice, formatChange, formatDate, stripHtml } from "../utils/formatter";
+import { NewsPanel } from "../components/NewsPanel";
 import {
     CartesianGrid,
     LineChart,
@@ -12,12 +13,15 @@ import {
     Tooltip,
 } from "recharts";
 
+const DESCRIPTION_PREVIEW_LENGTH = 320;
+
 export const CoinDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [coin, setCoin] = useState(null);
     const [chartData, setChartData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [descExpanded, setDescExpanded] = useState(false);
 
     useEffect(() => {
         loadCoinData();
@@ -92,8 +96,34 @@ export const CoinDetail = () => {
         );
     }
 
-    const priceChange = coin.market_data.price_change_percentage_24h || 0;
+    const marketData = coin.market_data;
+    const priceChange = marketData.price_change_percentage_24h || 0;
     const isPositive = priceChange >= 0;
+
+    const periodChanges = [
+        { label: "24h", value: marketData.price_change_percentage_24h },
+        { label: "7d", value: marketData.price_change_percentage_7d },
+        { label: "30d", value: marketData.price_change_percentage_30d },
+        { label: "1y", value: marketData.price_change_percentage_1y },
+    ];
+
+    const athPrice = marketData.ath?.usd;
+    const atlPrice = marketData.atl?.usd;
+    const currentPrice = marketData.current_price.usd;
+    const rangePercent =
+        athPrice && atlPrice !== undefined && athPrice > atlPrice
+            ? Math.min(100, Math.max(0, ((currentPrice - atlPrice) / (athPrice - atlPrice)) * 100))
+            : null;
+
+    const description = stripHtml(coin.description?.en).trim();
+    const showReadMore = description.length > DESCRIPTION_PREVIEW_LENGTH;
+    const descriptionText =
+        showReadMore && !descExpanded
+            ? `${description.slice(0, DESCRIPTION_PREVIEW_LENGTH).trimEnd()}…`
+            : description;
+
+    const explorerLink = coin.links?.blockchain_site?.find(Boolean);
+
     return (
         <div className="app">
             <header className="header">
@@ -118,12 +148,12 @@ export const CoinDetail = () => {
                             <p className="symbol">{coin.symbol.toUpperCase()}</p>
                         </div>
                     </div>
-                    <span className="rank">Rank #{coin.market_data.market_cap_rank}</span>
+                    <span className="rank">Rank #{marketData.market_cap_rank}</span>
                 </div>
 
                 <div className="coin-price-section">
                     <div className="current-price">
-                        <h2>{formatPrice(coin.market_data.current_price.usd)}</h2>
+                        <h2>{formatPrice(currentPrice)}</h2>
                         <span
                             className={`change-badge ${isPositive ? "positive" : "negative"}`}
                         >
@@ -131,21 +161,115 @@ export const CoinDetail = () => {
                         </span>
                     </div>
 
+                    <div className="period-changes">
+                        {periodChanges.map(({ label, value }) => (
+                            <div key={label} className="period-chip">
+                                <span className="period-label">{label}</span>
+                                <span
+                                    className={
+                                        value === null || value === undefined
+                                            ? ""
+                                            : value >= 0
+                                                ? "positive"
+                                                : "negative"
+                                    }
+                                >
+                                    {formatChange(value)}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+
                     <div className="price-ranges">
                         <div className="price-range">
                             <span className="range-label">24h High</span>
                             <span className="range-value">
-                                {formatPrice(coin.market_data.high_24h.usd)}
+                                {formatPrice(marketData.high_24h.usd)}
                             </span>
                         </div>
                         <div className="price-range">
                             <span className="range-label">24h Low</span>
                             <span className="range-value">
-                                {formatPrice(coin.market_data.low_24h.usd)}
+                                {formatPrice(marketData.low_24h.usd)}
                             </span>
                         </div>
                     </div>
+
+                    {rangePercent !== null && (
+                        <div className="ath-atl-bar">
+                            <div className="range-track">
+                                <div className="range-marker" style={{ left: `${rangePercent}%` }} />
+                            </div>
+                            <div className="range-endpoints">
+                                <span>ATL {formatPrice(atlPrice)}</span>
+                                <span>ATH {formatPrice(athPrice)}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
+
+                {description && (
+                    <div className="coin-about">
+                        <h3>About {coin.name}</h3>
+                        <p className="coin-description">{descriptionText}</p>
+                        {showReadMore && (
+                            <button
+                                className="read-more-btn"
+                                onClick={() => setDescExpanded((v) => !v)}
+                            >
+                                {descExpanded ? "Show less" : "Read more"}
+                            </button>
+                        )}
+
+                        {(coin.links?.homepage?.[0] ||
+                            coin.links?.twitter_screen_name ||
+                            coin.links?.subreddit_url ||
+                            explorerLink) && (
+                                <div className="coin-links">
+                                    {coin.links.homepage?.[0] && (
+                                        <a
+                                            href={coin.links.homepage[0]}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="coin-link-pill"
+                                        >
+                                            Website
+                                        </a>
+                                    )}
+                                    {coin.links.twitter_screen_name && (
+                                        <a
+                                            href={`https://twitter.com/${coin.links.twitter_screen_name}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="coin-link-pill"
+                                        >
+                                            Twitter
+                                        </a>
+                                    )}
+                                    {coin.links.subreddit_url && (
+                                        <a
+                                            href={coin.links.subreddit_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="coin-link-pill"
+                                        >
+                                            Reddit
+                                        </a>
+                                    )}
+                                    {explorerLink && (
+                                        <a
+                                            href={explorerLink}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="coin-link-pill"
+                                        >
+                                            Explorer
+                                        </a>
+                                    )}
+                                </div>
+                            )}
+                    </div>
+                )}
 
                 <div className="chart-section">
                     <h3>Price Chart · 7 Days</h3>
@@ -192,30 +316,93 @@ export const CoinDetail = () => {
                     <div className="stat-card">
                         <span className="stat-label">Market Cap</span>
                         <span className="stat-value">
-                            ${formatMarketCap(coin.market_data.market_cap.usd)}
+                            ${formatMarketCap(marketData.market_cap.usd)}
+                        </span>
+                    </div>
+
+                    <div className="stat-card">
+                        <span className="stat-label">Fully Diluted Valuation</span>
+                        <span className="stat-value">
+                            {marketData.fully_diluted_valuation?.usd
+                                ? `$${formatMarketCap(marketData.fully_diluted_valuation.usd)}`
+                                : "N/A"}
                         </span>
                     </div>
 
                     <div className="stat-card">
                         <span className="stat-label">Volume (24h)</span>
                         <span className="stat-value">
-                            ${formatMarketCap(coin.market_data.total_volume.usd)}
+                            ${formatMarketCap(marketData.total_volume.usd)}
                         </span>
                     </div>
 
                     <div className="stat-card">
                         <span className="stat-label">Circulating Supply</span>
                         <span className="stat-value">
-                            {coin.market_data.circulating_supply?.toLocaleString() || "N/A"}
+                            {marketData.circulating_supply?.toLocaleString() || "N/A"}{" "}
+                            {coin.symbol.toUpperCase()}
                         </span>
                     </div>
 
                     <div className="stat-card">
                         <span className="stat-label">Total Supply</span>
                         <span className="stat-value">
-                            {coin.market_data.total_supply?.toLocaleString() || "N/A"}
+                            {marketData.total_supply?.toLocaleString() || "N/A"}
                         </span>
                     </div>
+
+                    <div className="stat-card">
+                        <span className="stat-label">Max Supply</span>
+                        <span className="stat-value">
+                            {marketData.max_supply?.toLocaleString() || "∞"}
+                        </span>
+                    </div>
+
+                    <div className="stat-card">
+                        <span className="stat-label">All-Time High</span>
+                        <span className="stat-value">
+                            {formatPrice(athPrice)}{" "}
+                            <span
+                                className={
+                                    marketData.ath_change_percentage?.usd >= 0
+                                        ? "positive"
+                                        : "negative"
+                                }
+                            >
+                                {formatChange(marketData.ath_change_percentage?.usd)}
+                            </span>
+                        </span>
+                        <span className="stat-subvalue">
+                            {formatDate(marketData.ath_date?.usd)}
+                        </span>
+                    </div>
+
+                    <div className="stat-card">
+                        <span className="stat-label">All-Time Low</span>
+                        <span className="stat-value">
+                            {formatPrice(atlPrice)}{" "}
+                            <span
+                                className={
+                                    marketData.atl_change_percentage?.usd >= 0
+                                        ? "positive"
+                                        : "negative"
+                                }
+                            >
+                                {formatChange(marketData.atl_change_percentage?.usd)}
+                            </span>
+                        </span>
+                        <span className="stat-subvalue">
+                            {formatDate(marketData.atl_date?.usd)}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="news-wrapper">
+                    <NewsPanel
+                        currency={coin.symbol}
+                        title={`${coin.name} News`}
+                        limit={6}
+                    />
                 </div>
             </div>
             <footer className="footer">
